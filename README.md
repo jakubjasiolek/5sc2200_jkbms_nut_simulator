@@ -8,7 +8,8 @@ Eaton zgłosił LB po 6 min, a bateria działała jeszcze ~2 h przy 970 W).
 
 * czyta Eatona przez USB (prawdziwy `usbhid-ups`, w NUT jako **`eaton-raw`**),
 * czyta JK BMS przez BLE (albo kabel serial) przez `jktool`,
-* wystawia **skorygowanego UPS-a `ups`** przez `upsd` na porcie 3493:
+* wystawia **skorygowanego UPS-a `ups`** przez `upsd` na porcie 3493 oraz przez serwer zgodny z apcupsd
+  na porcie 3552 (natywne *UPS Settings* w Unraid):
   * status Eatona (OL/OB/CHRG…) **bez jego fałszywego `LB`**,
   * `battery.charge` = SoC z BMS,
   * `battery.runtime` liczony z energii w baterii i mocy obciążenia,
@@ -62,16 +63,22 @@ W ustawieniach VM odznacz *MGE UPS Systems UPS* (0463:ffff) i *Intel AX211 Bluet
 4. Dashboard: `http://<unraid>:8080`. Hasła NUT (jeśli ich nie ustawiłeś) są w
    `/mnt/user/appdata/bmsups/secrets.env`.
 
-### 5. Plugin NUT w Unraid
-Zainstaluj *NUT for UNRAID* (Community Applications) i ustaw:
-* tryb **netclient** (slave), host `127.0.0.1`, port `3493`, UPS **`ups`**,
-  użytkownik `monuser` + hasło z `secrets.env`,
-* shutdown: **na sygnał Low Battery** (bateria/czas = „wg UPS-a”). Progi ustawiasz w kontenerze
-  (`LB_SOC`, `LB_RUNTIME_S`), nie w pluginie. Nie ustawiaj shutdownu „po X sekundach na baterii”,
-  bo Unraid wyłączy się niepotrzebnie wcześnie,
-* *killpower* w pluginie **wyłączony**, bo robi to kontener.
+### 5. Unraid: natywnie, bez pluginów (zalecane)
+Kontener ma też serwer zgodny z apcupsd (NIS) na porcie **3552**. Wbudowany apcupsd w Unraid
+podłącza się do niego jak do zdalnego UPS-a APC.
+*Settings → UPS Settings*:
+* **Start APC UPS daemon:** Yes
+* **UPS cable:** Ether, **UPS type:** Net, **Device:** `127.0.0.1:3552`
+* **Battery level to initiate shutdown:** `10`, **Runtime left to initiate shutdown:** `5`
+  (zapasowe progi, niższe niż w kontenerze, który wyśle LOWBATT przy 20% / 15 min)
+* **Time on battery before shutdown:** `0` (wyłączone)
+* **Turn off UPS after shutdown:** No (killpower robi kontener)
 
-Po zmianach widżet UPS w Unraid pokazuje SoC z BMS i realny czas pracy.
+Widżet UPS na dashboardzie Unraid pokaże SoC z BMS i realny czas pracy. Sprawdzenie:
+`apcaccess` w terminalu Unraid.
+
+Zamiast tego możesz użyć pluginu *NUT for UNRAID* w trybie `netclient` (`ups@127.0.0.1:3493`,
+`monuser` + hasło z `secrets.env`, shutdown na Low Battery, killpower wyłączony). Nie używaj obu naraz.
 
 ### 6. Inne urządzenia
 Dowolny klient NUT: `ups@<ip-unraid>:3493`, użytkownik `monuser`. Przykład dla `upsmon.conf`:
@@ -96,6 +103,7 @@ Gdy wszystko działa na Unraid: `sudo systemctl disable --now bmsdash nut-driver
 | `NUT_ADMIN_USER` / `NUT_ADMIN_PASSWORD` | admin / (gen.) | upscmd/upsrw |
 | `UPS_NAME` / `UPS_RAW_NAME` | ups / eaton-raw | nazwy w NUT |
 | `NUT_PORT` / `HTTP_PORT` | 3493 / 8080 | porty (sieć host) |
+| `APC_NIS_PORT` | 3552 | serwer apcupsd NIS dla Unraid; 0 = wyłączony |
 
 ## Test po wdrożeniu
 1. `upsc ups@localhost` w Unraid pokazuje `battery.type: LiFePO4` i `battery.charge` = SoC z BMS.
@@ -119,6 +127,7 @@ nie połączy się, dopóki działa kontener.
 ## Pliki
 * `app/estimator.py`: logika SoC/runtime/LB/killpower (bez I/O, testowalna)
 * `app/bridge.py`: wątki UPS/BMS, plik `.dev`, CSV, HTTP
+* `app/apcnis.py`: serwer apcupsd NIS (natywna obsługa UPS w Unraid)
 * `app/bmsdash.html`: dashboard
 * `rootfs/`: entrypoint, supervisord, uruchamianie sterowników NUT
 * `unraid/bmsups.xml`: szablon Unraid

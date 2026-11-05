@@ -6,6 +6,7 @@
 * BMS thread  : polls the BMS via jktool (BLE or serial) in a loop (single
                 connection - the BMS allows only one), appends the CSV.
 * HTTP server : dashboard + /api/state on HTTP_PORT.
+* apcupsd NIS : APC_NIS_PORT, so Unraid's built-in apcupsd (type Net) can follow it.
 Stdlib only.
 """
 import csv
@@ -18,6 +19,9 @@ import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import socket
+
+import apcnis
 from estimator import Config, Estimator, write_dev
 
 E = os.environ.get
@@ -31,6 +35,7 @@ DEV_PATH = E("VIRTUAL_DEV_PATH", "/run/nut/ups.dev")
 NUT_ADMIN_USER = E("NUT_ADMIN_USER", "admin")
 NUT_ADMIN_PASSWORD = E("NUT_ADMIN_PASSWORD", "")
 PORT = int(E("HTTP_PORT", "8080"))
+APC_NIS_PORT = int(E("APC_NIS_PORT", "3552"))  # 0 = off; 3551 is used by Unraid's own apcupsd
 UPS_POLL_S = float(E("UPS_POLL_S", "2"))
 BMS_PAUSE_S = float(E("BMS_PAUSE_S", "4"))
 CSV_EVERY = float(E("CSV_EVERY_S", "10"))
@@ -317,6 +322,15 @@ if __name__ == "__main__":
     threading.Thread(target=ups_loop, daemon=True, name="ups").start()
     if BMS_TARGET.lower() != "none":
         threading.Thread(target=bms_loop, daemon=True, name="bms").start()
+    if APC_NIS_PORT:
+        started = time.time()
+
+        def nis_status():
+            with lock:
+                fresh = state["ups"] is not None and time.time() - state["ups_t"] < 30
+                return apcnis.build_status(state["virtual"] if fresh else None, state["ups"], est.cfg, started,
+                                           socket.gethostname(), E("UPS_NAME", "ups"))
+        apcnis.start(APC_NIS_PORT, nis_status, log)
     # The dashboard must never take the virtual UPS down: if the port is taken,
     # keep NUT running and retry the HTTP bind periodically.
     while True:

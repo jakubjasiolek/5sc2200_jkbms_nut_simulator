@@ -7,7 +7,7 @@
   <Privileged>true</Privileged>
   <Support>https://github.com/jakubjasiolek/5sc2200_jkbms_nut_simulator</Support>
   <Project>https://github.com/jakubjasiolek/5sc2200_jkbms_nut_simulator</Project>
-  <Overview>Wirtualny UPS NUT dla Eaton 5SC z baterią LFP: stan UPS-a z Eatona (USB), SoC i czas pracy z JK BMS (BLE/serial). upsd na :3493 (UPS "ups" = skorygowany, "eaton-raw" = surowy), dashboard na :8080. Wymaga: USB UPS-a i adaptera BT podłączonych do Unraid (nie do VM).</Overview>
+  <Overview>Wirtualny UPS NUT dla Eaton 5SC z baterią LFP: stan UPS-a z Eatona (USB), SoC i czas pracy z JK BMS (BLE/serial). upsd na :3493 (UPS "ups" = skorygowany, "eaton-raw" = surowy), serwer apcupsd NIS na :3552 (natywna obsługa UPS w Unraid), dashboard na :8080. Wymaga: USB UPS-a i adaptera BT podłączonych do Unraid (nie do VM).</Overview>
   <Category>Tools: Status:Stable</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
@@ -24,6 +24,7 @@
   <Config Name="Battery capacity Ah" Target="CAPACITY_AH" Default="50" Description="Używane gdy BMS nie poda pojemności" Type="Variable" Display="advanced" Required="true" Mask="false">50</Config>
   <Config Name="Nominal voltage" Target="V_NOM" Default="51.2" Description="16S LFP = 51.2" Type="Variable" Display="advanced" Required="true" Mask="false">51.2</Config>
   <Config Name="Dashboard port" Target="HTTP_PORT" Default="8080" Description="Port dashboardu (sieć host)" Type="Variable" Display="advanced" Required="true" Mask="false">8080</Config>
+  <Config Name="apcupsd NIS port" Target="APC_NIS_PORT" Default="3552" Description="Serwer zgodny z apcupsd dla natywnych ustawień UPS w Unraid (Settings → UPS Settings: kabel Ether, typ Net, urządzenie 127.0.0.1:3552). 0 = wyłączony. Nie używaj 3551, ten port zajmuje apcupsd Unraid" Type="Variable" Display="always" Required="true" Mask="false">3552</Config>
   <Config Name="NUT port" Target="NUT_PORT" Default="3493" Description="Port upsd. Zmień, jeśli plugin NUT na Unraid sam nasłuchuje na 3493" Type="Variable" Display="advanced" Required="true" Mask="false">3493</Config>
   <Config Name="Timezone" Target="TZ" Default="Europe/Warsaw" Description="" Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Warsaw</Config>
 </Container>

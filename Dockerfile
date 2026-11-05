@@ -34,6 +34,7 @@ ENV CONFIG_DIR=/config \
     NUT_ADMIN_USER=admin \
     NUT_ADMIN_PASSWORD= \
     HTTP_PORT=8080 \
+    APC_NIS_PORT=3552 \
     LB_SOC=20 \
     LB_RUNTIME_S=900 \
     LB_CELL_V=3.0 \
@@ -44,6 +45,6 @@ ENV CONFIG_DIR=/config \
     TZ=Europe/Warsaw
 
 VOLUME /config
-EXPOSE 3493 8080
+EXPOSE 3493 3552 8080
 HEALTHCHECK --interval=60s --timeout=5s --start-period=60s CMD python3 -c "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:%s/healthz'%os.environ.get('HTTP_PORT','8080'),timeout=4)"
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

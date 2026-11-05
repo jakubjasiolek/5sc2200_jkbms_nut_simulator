@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BMS UPS</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#fff; --ink:#15181d; --mute:#667085; --line:#e4e7ec;
+  --bms:#0b7a75; --ups:#c2410c; --virt:#4f46e5; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --grid:#eceff3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0e1116; --card:#171b22; --ink:#e8ebf0; --mute:#8b94a3; --line:#262c36;
+         --bms:#2dd4bf; --ups:#fb923c; --virt:#a5b4fc; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --grid:#222833; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:650}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:var(--card)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.ok .dot{background:var(--ok)} .warn .dot{background:var(--warn)} .bad .dot{background:var(--bad)}
+.banner{display:none;margin-bottom:12px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--bad) 14%,var(--card));border:1px solid var(--bad);font-size:14px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:0 0 10px;font-weight:600}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+.cmp .lab{grid-column:1/-1;font-size:12px;color:var(--mute);margin-top:6px}
+.big{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+.big small{font-size:14px;font-weight:500;color:var(--mute);margin-left:3px}
+.tag{font-size:11px;font-weight:650;letter-spacing:.05em}
+.b{color:var(--bms)} .u{color:var(--ups)} .v{color:var(--virt)}
+.vcard{border-color:var(--virt)}
+.vgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px}@media(max-width:760px){.vgrid{grid-template-columns:1fr 1fr}}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px}
+dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.range{display:flex;gap:6px}
+.range button{font:inherit;font-size:13px;padding:3px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.range button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chart h2{display:flex;justify-content:space-between;align-items:center}
+.leg{font-size:12px;text-transform:none;letter-spacing:0;display:flex;gap:12px}
+.leg i{display:inline-block;width:10px;height:3px;margin-right:5px;vertical-align:middle;border-radius:2px}
+canvas{width:100%;height:170px;display:block}
+.cells{display:grid;grid-template-columns:repeat(16,1fr);gap:4px;align-items:end;height:120px}
+.cell{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:10px;color:var(--mute)}
+.cell .bar{width:100%;background:var(--bms);border-radius:3px 3px 0 0;opacity:.85}
+.cell.hi .bar{background:var(--warn)} .cell.lo .bar{background:var(--ups)}
+.cell span{margin-top:3px;font-variant-numeric:tabular-nums}
+.err{color:var(--bad);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>bmsups · Eaton + JK BMS</h1>
+    <div class="pills">
+      <span class="pill" id="pBms"><span class="dot"></span><span>BMS</span></span>
+      <span class="pill" id="pUps"><span class="dot"></span><span>UPS</span></span>
+      <span class="pill" id="pNow"><span class="dot"></span><span>&nbsp;</span></span>
+    </div>
+  </header>
+  <div class="banner" id="banner"></div>
+
+  <div class="card vcard" style="margin-bottom:12px">
+    <h2 class="v">Virtual UPS (NUT <span id="vName">ups</span>) — what Unraid and NUT clients see</h2>
+    <div class="vgrid">
+      <div><div class="tag v">Status</div><div class="big" id="vSt" style="font-size:20px">–</div></div>
+      <div><div class="tag v">Charge</div><div class="big" id="vSoc">–<small>%</small></div></div>
+      <div><div class="tag v">Est. runtime</div><div class="big" id="vRt">–</div></div>
+      <div><div class="tag v">Shutdown at</div><div class="big" id="vLb" style="font-size:20px">–</div></div>
+    </div>
+    <dl id="dlV" style="margin-top:10px"></dl>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:12px">
+    <div class="card">
+      <h2>State of charge</h2>
+      <div class="cmp">
+        <div><div class="tag b">BMS</div><div class="big" id="socB">–<small>%</small></div></div>
+        <div><div class="tag u">Eaton raw (lead-acid model)</div><div class="big" id="socU">–<small>%</small></div></div>
+        <div class="lab" id="socNote"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Power</h2>
+      <div class="cmp">
+        <div><div class="tag b">BMS (DC, + charging)</div><div class="big" id="pwB">–<small>W</small></div></div>
+        <div><div class="tag u">UPS load (AC out)</div><div class="big" id="pwU">–<small>W</small></div></div>
+        <div class="lab" id="pwNote"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <div class="cmp">
+        <div><div class="tag b">BMS</div><div class="big" id="stB" style="font-size:20px">–</div></div>
+        <div><div class="tag u">UPS</div><div class="big" id="stU" style="font-size:20px">–</div></div>
+        <div class="lab" id="stNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:12px">
+    <div class="card"><h2 class="b">JK BMS</h2><dl id="dlB"></dl><div class="err" id="errB"></div></div>
+    <div class="card"><h2 class="u">Eaton 5SC 2200</h2><dl id="dlU"></dl><div class="err" id="errU"></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <h2>Cell voltages <span style="float:right;text-transform:none;letter-spacing:0" id="cellInfo"></span></h2>
+    <div class="cells" id="cells"></div>
+  </div>
+
+  <div class="range" style="margin:4px 0 10px">
+    <button data-m="60" class="on">1 h</button><button data-m="360">6 h</button><button data-m="1440">24 h</button><button data-m="2880">48 h</button><button data-m="4320">72 h</button><button data-m="10080">7 d</button><button data-m="20160">14 d</button><button data-m="43200">30 d</button>
+  </div>
+  <div class="grid g2">
+    <div class="card chart"><h2>State of charge (%)<span class="leg"><span><i style="background:var(--bms)"></i>BMS</span><span><i style="background:var(--virt)"></i>virtual</span><span><i style="background:var(--ups)"></i>Eaton raw</span></span></h2><canvas id="cSoc"></canvas></div>
+    <div class="card chart"><h2>Power (W)<span class="leg"><span><i style="background:var(--bms)"></i>BMS</span><span><i style="background:var(--ups)"></i>UPS load</span></span></h2><canvas id="cPw"></canvas></div>
+    <div class="card chart"><h2>Pack voltage (V)<span class="leg"><span><i style="background:var(--bms)"></i>pack</span></span></h2><canvas id="cV"></canvas></div>
+    <div class="card chart"><h2>Cell min / max (V)<span class="leg"><span><i style="background:var(--bms)"></i>max</span><span><i style="background:var(--ups)"></i>min</span></span></h2><canvas id="cC"></canvas></div>
+  </div>
+</div>
+
+<script>
+let mins = 60, last = null;
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const f = (x, d=1) => (x == null || isNaN(x)) ? '–' : Number(x).toFixed(d);
+const setBig = (id, v, u) => $(id).innerHTML = v + '<small>' + u + '</small>';
+const pill = (id, cls, txt) => { const e = $(id); e.className = 'pill ' + cls; e.lastElementChild.textContent = txt; };
+const age = s => s == null ? 'never' : s < 90 ? Math.round(s) + ' s ago' : Math.round(s/60) + ' min ago';
+
+function rows(el, list){ el.innerHTML = list.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join(''); }
+
+function render(d){
+  last = d;
+  const b = d.bms, u = d.ups;
+  const bOk = b && d.bms_age != null && d.bms_age < 45;
+  const uOk = u && d.ups_age != null && d.ups_age < 45;
+  pill('pBms', bOk ? 'ok' : (b ? 'warn' : 'bad'), 'BMS ' + (bOk ? 'live' : 'stale · ' + age(d.bms_age)));
+  pill('pUps', uOk ? 'ok' : (u ? 'warn' : 'bad'), 'UPS ' + (uOk ? 'live' : 'stale · ' + age(d.ups_age)));
+  pill('pNow', 'ok', new Date(d.now*1000).toLocaleTimeString());
+  const bn = $('banner');
+  if (!bOk){ bn.style.display = 'block'; bn.textContent = 'BMS data is ' + (b ? 'stale (' + age(d.bms_age) + ')' : 'unavailable') + (d.bms_err ? ' — ' + d.bms_err : '') + '. Showing last known values.'; }
+  else bn.style.display = 'none';
+
+  if (b){
+    const sig = b.current > 0.05 ? 'Charging' : b.current < -0.05 ? 'Discharging' : 'Idle';
+    setBig('socB', f(b.soc,0), '%');
+    setBig('pwB', f(b.charging_power - b.discharging_power, 0), 'W');
+    $('stB').textContent = sig;
+    rows($('dlB'), [
+      ['Pack voltage', f(b.voltage,2) + ' V'],
+      ['Current', f(b.current,2) + ' A'],
+      ['Remaining / total', f(b.capacity_remaining,1) + ' / ' + f(b.total_capacity,1) + ' Ah'],
+      ['Cell min / max / Δ', f(b.cell_min,3) + ' / ' + f(b.cell_max,3) + ' / ' + f(b.cell_diff*1000,0) + ' mV'],
+      ['Balancing', b.balancing ? 'on · ' + f(b.balancing_current,2) + ' A' : 'off'],
+      ['Charge / discharge MOS', (b.charging_mos ? 'on' : 'OFF') + ' / ' + (b.discharging_mos ? 'on' : 'OFF')],
+      ['MOSFET / probe temp', f(b.mosfet_temp,1) + ' / ' + f((b.temps||[]).filter(t=>t>-100).slice(0,1)[0],1) + ' °C'],
+      ['Cycles / SOH', b.charging_cycles + ' / ' + f(b.soh,0) + ' %'],
+      ['Errors', (b.errors && b.errors.length) ? b.errors.join(', ') : 'none']
+    ]);
+    const cv = b.cell_voltages, mn = Math.min(...cv), mx = Math.max(...cv);
+    $('cellInfo').textContent = 'avg ' + f(b.cell_avg,3) + ' V';
+    const lo = 3.0, hi = Math.max(3.65, mx + .02);
+    $('cells').innerHTML = cv.map((v,i) => {
+      const h = Math.max(4, (v - lo) / (hi - lo) * 100);
+      const cls = (v === mx && mx - mn > .004) ? 'hi' : (v === mn && mx - mn > .004) ? 'lo' : '';
+      return `<div class="cell ${cls}" title="Cell ${i+1}: ${v.toFixed(3)} V"><div class="bar" style="height:${h}%"></div><span>${(v*1000).toFixed(0).slice(-3)}</span></div>`;
+    }).join('');
+  }
+  if (u){
+    setBig('socU', f(u['battery.charge'],0), '%');
+    setBig('pwU', f(u['ups.realpower'],0), 'W');
+    const st = u['ups.status'] || '';
+    $('stU').textContent = (st.includes('OB') ? 'On battery' : st.includes('OL') ? 'Mains' : st) + (st.includes('CHRG') ? ' · charging' : '') + (st.includes('LB') ? ' · LOW' : '');
+    rows($('dlU'), [
+      ['Status flags', st],
+      ['Charger', (u['battery.charger.status'] || '–') + ' · ' + (u['battery.charger.type'] || '–')],
+      ['Input / output', f(u['input.voltage'],0) + ' / ' + f(u['output.voltage'],0) + ' V'],
+      ['Load', f(u['ups.load'],0) + ' %  ·  ' + f(u['ups.realpower'],0) + ' W  ·  ' + f(u['ups.power'],0) + ' VA'],
+      ['Est. runtime (raw)', u['battery.runtime'] ? Math.round(u['battery.runtime']/60) + ' min (lead-acid model, ignored)' : '–'],
+      ['Battery model', (u['battery.type'] || '–') + ' · ' + f(u['battery.capacity'],0) + ' Ah'],
+      ['Low-batt level', f(u['battery.charge.low'],0) + ' %'],
+      ['Last self-test', u['ups.test.result'] || '–'],
+      ['Battery voltage', 'not reported by UPS']
+    ]);
+  }
+  if (b && u){
+    const diff = b.soc - parseFloat(u['battery.charge']);
+    $('socNote').textContent = Math.abs(diff) < 3 ? 'BMS and UPS agree.' : 'UPS estimate is ' + Math.abs(diff).toFixed(0) + ' points ' + (diff > 0 ? 'below' : 'above') + ' the BMS (UPS assumes lead-acid; trust the BMS).';
+    const dc = b.charging_power - b.discharging_power, ac = parseFloat(u['ups.realpower']);
+    $('pwNote').textContent = 'Net DC ' + (dc >= 0 ? 'in ' : 'out ') + Math.abs(dc).toFixed(0) + ' W vs AC load ' + ac.toFixed(0) + ' W.';
+    const onB = (u['ups.status']||'').includes('OB');
+    $('stNote').textContent = onB ? 'Running on battery.' : (b.current > .05 ? 'Mains up, battery charging.' : 'Mains up.');
+  }
+  renderVirtual(d);
+  $('errB').textContent = d.bms_err && !bOk ? 'BMS: ' + d.bms_err : '';
+  $('errU').textContent = d.ups_err && !uOk ? 'UPS: ' + d.ups_err : '';
+  draw(d);
+}
+
+const dur = s => s == null ? '–' : s >= 86400 ? (s/86400).toFixed(1) + ' d' : s >= 3600 ? Math.floor(s/3600) + ' h ' + String(Math.round(s%3600/60)).padStart(2,'0') : Math.round(s/60) + ' min';
+function renderVirtual(d){
+  const v = d.virtual, e = d.est || {}, c = d.config || {};
+  if (!v){ $('vSt').textContent = 'no data'; return; }
+  const st = v['ups.status'] || '', lb = st.split(' ').includes('LB');
+  $('vSt').innerHTML = (st.includes('OB') ? 'On battery' : st.includes('OL') ? 'Mains' : st) + (st.includes('CHRG') ? ' · charging' : '') + (lb ? ' · <span style="color:var(--bad)">LOW</span>' : '');
+  setBig('vSoc', f(v['battery.charge'],0), '%');
+  $('vRt').textContent = dur(num(v['battery.runtime']));
+  $('vLb').textContent = '≤ ' + f(c.lb_soc,0) + '% or ≤ ' + f(c.lb_runtime_s/60,0) + ' min';
+  rows($('dlV'), [
+    ['NUT status flags', st],
+    ['Low-battery reason', e.lb ? e.lb_reason : 'none'],
+    ['SoC source', e.soc_src === 'bms' ? 'BMS (live)' : e.soc_src === 'extrapolated' ? 'extrapolated from UPS load (BMS stale ' + age(e.bms_age) + ')' : e.soc_src || '–'],
+    ['DC/AC ratio (learned)', f(e.dc_ac_ratio,3)],
+    ['Killpower', !e.killpower_enabled ? 'disabled' : e.killpower_sent ? 'SENT at ' + new Date(e.killpower_at*1000).toLocaleTimeString() + ' · output off ' + f(e.killpower_delay_s,0) + ' s later' : 'on LB: shutdown.return, output off after ' + f(e.killpower_delay_s,0) + ' s, back on with mains'],
+    ['BMS link', c.bms_target || '–']
+  ]);
+}
+const num = x => { const n = parseFloat(x); return isNaN(n) ? null : n; };
+
+function line(cv, series, opts={}){
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0,0,W,H);
+  const pad = {l:44, r:8, t:8, b:20}, w = W-pad.l-pad.r, h = H-pad.t-pad.b;
+  const all = series.flatMap(s => s.pts.filter(p => p[1] != null));
+  if (!all.length){ g.fillStyle = css('--mute'); g.font = '13px system-ui'; g.fillText('no data yet', pad.l, H/2); return; }
+  const t0 = last.now - mins*60, t1 = last.now;
+  let lo = Math.min(...all.map(p=>p[1])), hi = Math.max(...all.map(p=>p[1]));
+  if (opts.min != null) lo = Math.min(lo, opts.min); if (opts.max != null) hi = Math.max(hi, opts.max);
+  if (hi - lo < (opts.span||0.5)){ const m = (hi+lo)/2; lo = m-(opts.span||0.5)/2; hi = m+(opts.span||0.5)/2; }
+  const padv = (hi-lo)*.08; lo -= padv; hi += padv;
+  const X = t => pad.l + (t-t0)/(t1-t0)*w, Y = v => pad.t + (1-(v-lo)/(hi-lo))*h;
+  g.strokeStyle = css('--grid'); g.fillStyle = css('--mute'); g.font = '11px system-ui'; g.lineWidth = 1;
+  for (let i=0;i<=4;i++){ const v = lo+(hi-lo)*i/4, y = Y(v); g.beginPath(); g.moveTo(pad.l,y); g.lineTo(W-pad.r,y); g.stroke();
+    g.textAlign='right'; g.fillText(v.toFixed(opts.dec ?? 1), pad.l-6, y+4); }
+  g.textAlign='center';
+  for (let i=0;i<=4;i++){ const t = t0+(t1-t0)*i/4; g.fillText(mins > 1440 ? new Date(t*1000).toLocaleDateString([],{day:'numeric',month:'short'}) + (mins <= 20160 ? ' ' + new Date(t*1000).toLocaleTimeString([],{hour:'2-digit'}) + 'h' : '') : new Date(t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), pad.l+w*i/4, H-5); }
+  series.forEach(s => {
+    g.strokeStyle = css(s.color); g.lineWidth = 2; g.beginPath(); let open = false, prev = null;
+    s.pts.forEach(([t,v]) => { if (v == null){ open = false; return; }
+      if (prev != null && t - prev > Math.max(180, mins*60/600*4)) open = false;
+      const x = X(t), y = Y(v); if (!open){ g.moveTo(x,y); open = true; } else g.lineTo(x,y); prev = t; });
+    g.stroke();
+  });
+}
+
+function draw(d){
+  const H = d.history, p = k => H.map(x => [x.t, x[k] ?? null]);
+  line($('cSoc'), [{pts:p('vsoc'),color:'--virt'},{pts:p('soc'),color:'--bms'},{pts:p('usoc'),color:'--ups'}], {min:0,max:100,dec:0,span:10});
+  line($('cPw'),  [{pts:p('pw'),color:'--bms'},{pts:p('uw'),color:'--ups'}], {min:0,dec:0,span:20});
+  line($('cV'),   [{pts:p('v'),color:'--bms'}], {dec:2,span:1});
+  line($('cC'),   [{pts:p('cmax'),color:'--bms'},{pts:p('cmin'),color:'--ups'}], {dec:3,span:.02});
+}
+
+async function tick(){
+  try { const r = await fetch('/api/state?mins=' + mins, {cache:'no-store'}); render(await r.json()); }
+  catch(e){ pill('pNow','bad','dashboard offline'); }
+}
+document.querySelectorAll('.range button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.range button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  mins = +b.dataset.m; tick();
+});
+window.addEventListener('resize', () => last && draw(last));
+tick(); setInterval(tick, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>bmsups</Name>
+  <Repository>ghcr.io/jakubjasiolek/bmsups:latest</Repository>
+  <Registry>https://github.com/jakubjasiolek/5sc2200_jkbms_nut_simulator/pkgs/container/bmsups</Registry>
+  <Network>host</Network>
+  <Privileged>true</Privileged>
+  <Support>https://github.com/jakubjasiolek/5sc2200_jkbms_nut_simulator</Support>
+  <Project>https://github.com/jakubjasiolek/5sc2200_jkbms_nut_simulator</Project>
+  <Overview>Wirtualny UPS NUT dla Eaton 5SC z baterią LFP: stan UPS-a z Eatona (USB), SoC i czas pracy z JK BMS (BLE/serial). upsd na :3493 (UPS "ups" = skorygowany, "eaton-raw" = surowy), dashboard na :8080. Wymaga: USB UPS-a i adaptera BT podłączonych do Unraid (nie do VM).</Overview>
+  <Category>Tools: Status:Stable</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/bmsups" Mode="rw" Description="Historia CSV, wyuczone parametry, wygenerowane hasła NUT (secrets.env)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/bmsups</Config>
+  <Config Name="BMS link" Target="BMS_TARGET" Default="bt:hci0/dev_28_D4_1E_90_02_0F,ffe1" Description="jktool transport: bt:hci0/dev_AA_BB_CC_DD_EE_FF,ffe1 albo serial:/dev/ttyUSB0,115200 albo none" Type="Variable" Display="always" Required="true" Mask="false">bt:hci0/dev_28_D4_1E_90_02_0F,ffe1</Config>
+  <Config Name="NUT monitor user" Target="NUT_MONITOR_USER" Default="monuser" Description="Użytkownik dla klientów NUT (Unraid, inne serwery)" Type="Variable" Display="always" Required="true" Mask="false">monuser</Config>
+  <Config Name="NUT monitor password" Target="NUT_MONITOR_PASSWORD" Default="" Description="Puste = wygeneruj i zapisz w /config/secrets.env" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="NUT admin password" Target="NUT_ADMIN_PASSWORD" Default="" Description="Do upscmd/upsrw (killpower). Puste = wygeneruj" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="LB: SoC %" Target="LB_SOC" Default="20" Description="Zgłoś LB (shutdown) gdy SoC z BMS &lt;= tej wartości" Type="Variable" Display="always" Required="true" Mask="false">20</Config>
+  <Config Name="LB: runtime s" Target="LB_RUNTIME_S" Default="900" Description="Zgłoś LB gdy szacowany czas pracy &lt;= tylu sekund" Type="Variable" Display="always" Required="true" Mask="false">900</Config>
+  <Config Name="LB: cell V" Target="LB_CELL_V" Default="3.0" Description="Zgłoś LB gdy najsłabsze ogniwo &lt;= tego napięcia" Type="Variable" Display="advanced" Required="true" Mask="false">3.0</Config>
+  <Config Name="Killpower" Target="KILLPOWER" Default="1" Description="1 = po LB wyślij do Eatona shutdown.return (UPS wyłączy wyjście i włączy po powrocie prądu)" Type="Variable" Display="always" Required="true" Mask="false">1</Config>
+  <Config Name="Killpower delay s" Target="KILLPOWER_DELAY_S" Default="180" Description="Przy LB kontener od razu wysyła shutdown.return; Eaton odcina wyjście po tylu sekundach (Unraid musi zdążyć się zamknąć) i włącza je po powrocie prądu" Type="Variable" Display="always" Required="true" Mask="false">180</Config>
+  <Config Name="Battery capacity Ah" Target="CAPACITY_AH" Default="50" Description="Używane gdy BMS nie poda pojemności" Type="Variable" Display="advanced" Required="true" Mask="false">50</Config>
+  <Config Name="Nominal voltage" Target="V_NOM" Default="51.2" Description="16S LFP = 51.2" Type="Variable" Display="advanced" Required="true" Mask="false">51.2</Config>
+  <Config Name="Dashboard port" Target="HTTP_PORT" Default="8080" Description="Port dashboardu (sieć host)" Type="Variable" Display="advanced" Required="true" Mask="false">8080</Config>
+  <Config Name="NUT port" Target="NUT_PORT" Default="3493" Description="Port upsd. Zmień, jeśli plugin NUT na Unraid sam nasłuchuje na 3493" Type="Variable" Display="advanced" Required="true" Mask="false">3493</Config>
+  <Config Name="Timezone" Target="TZ" Default="Europe/Warsaw" Description="" Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Warsaw</Config>
+</Container>

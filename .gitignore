@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.dev
+*.csv
+state.json
+secrets.env

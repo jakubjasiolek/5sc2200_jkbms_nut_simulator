@@ -187,6 +187,10 @@ def ups_loop():
                 state["ups_err"] = str(e)
         with lock:
             u = state["ups"] if now - state["ups_t"] < 30 else None
+            # Publish nothing until the raw driver reports a real power state
+            # (e.g. it says WAIT right after start) - never invent "OL".
+            if u is not None and not {"OL", "OB", "OFF", "BYPASS"} & set(u.get("ups.status", "").split()):
+                u = None
             if u is not None:
                 v = est.step(u, now)
                 prev = (state["virtual"] or {}).get("ups.status")

@@ -225,6 +225,8 @@ def ups_loop():
 
 def bms_loop():
     last_csv = 0.0
+    if BMS_TARGET.startswith("bt:"):
+        time.sleep(float(E("BMS_START_DELAY_S", "8")))  # let bluetoothd register on D-Bus first
     while True:
         try:
             b = read_bms()
@@ -311,4 +313,15 @@ if __name__ == "__main__":
     threading.Thread(target=ups_loop, daemon=True, name="ups").start()
     if BMS_TARGET.lower() != "none":
         threading.Thread(target=bms_loop, daemon=True, name="bms").start()
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    # The dashboard must never take the virtual UPS down: if the port is taken,
+    # keep NUT running and retry the HTTP bind periodically.
+    while True:
+        try:
+            srv = ThreadingHTTPServer(("0.0.0.0", PORT), H)
+        except OSError as e:
+            log.error("dashboard: cannot bind :%d (%s) - NUT keeps running; set HTTP_PORT to a free port. "
+                      "Retrying in 60 s", PORT, e)
+            time.sleep(60)
+            continue
+        log.info("dashboard on :%d", PORT)
+        srv.serve_forever()

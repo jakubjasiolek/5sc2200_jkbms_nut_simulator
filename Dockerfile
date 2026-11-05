@@ -1,9 +1,16 @@
 # ---- build jktool (JK BMS CLI, crates.io jk_bms) -------------------------------
 FROM rust:1-slim-trixie AS jktool
-RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libdbus-1-dev libudev-dev libsystemd-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libdbus-1-dev libudev-dev libsystemd-dev curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 ARG JK_BMS_VERSION=0.5.0
-RUN cargo install jk_bms --version ${JK_BMS_VERSION} --locked --root /out
+# jk_bms 0.5.0 on crates.io does not compile: src/bin/jktool/main.rs misses the
+# `get_can_info_command` import. Fetch the crate, add the import if missing, build from path.
+WORKDIR /src
+RUN curl -fsSL "https://static.crates.io/crates/jk_bms/jk_bms-${JK_BMS_VERSION}.crate" | tar xz --strip-components=1 \
+ && if ! grep -q '^use jk_bms::{.*get_can_info_command' src/bin/jktool/main.rs; then \
+      sed -i 's/^use jk_bms::{SETTINGS, build_setting_write_frame, build_can_setting_write_frame};/use jk_bms::{SETTINGS, build_setting_write_frame, build_can_setting_write_frame, get_can_info_command};/' src/bin/jktool/main.rs; fi \
+ && grep -n '^use jk_bms::{' src/bin/jktool/main.rs \
+ && cargo install --path . --locked --root /out
 
 # ---- runtime -------------------------------------------------------------------
 FROM debian:trixie-slim
